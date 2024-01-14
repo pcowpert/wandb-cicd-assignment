@@ -1,0 +1,49 @@
+name: wandb-cicd-assignment
+on: [issue_comment]
+
+permissions:
+  contents: read
+  issues: write
+  pull-requests: write
+
+jobs:
+  wandb-compare-runs:
+    if: (github.event.issue.pull_request != null) && contains(github.event.comment.body, '/wandb')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          pip install -U pip
+          pip install -r requirements.txt
+
+      - name: Parse W&B Run ID from comment.
+        id: parse-comment
+        env:
+          PR_COMMENT: ${{ github.event.comment.body }}
+        run: python parse_comment.py
+
+      - name: Generate the comparison report
+        if: steps.parse-comment.outputs.DO_COMPARISON == 'true'
+        id: run-comparison
+        run: python run_comparison.py
+        env:
+          RUN_ID: "${{ steps.parse-comment.outputs.RUN_ID }}"
+          WANDB_API_KEY: ${{ secrets.WANDB_API_KEY }}
+
+      - name: Submit comment to PR.
+        uses: actions/github-script@v7
+        if: steps.run-comparison.success == 'true'
+        with:
+          script: |
+            var msg = `[Run Comparison](${process.env.REPORT_URL})`
+            github.rest.issues.createComment({
+               issue_number: context.issue.number,
+               owner: context.repo.owner,
+               repo: context.repo.repo,
+               body: msg
+             });
+        env:
+          REPORT_URL: "${{ steps.run-comparison.outputs.REPORT_URL }}"
