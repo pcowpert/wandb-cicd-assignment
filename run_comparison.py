@@ -35,7 +35,11 @@ def compare_runs(run_id: str) -> None:
     report.blocks = report.blocks[:1] + [report_grid] + report.blocks[1:]
     report.save()
 
-    os.environ["GITHUB_OUTPUT"] = f"REPORT_URL={report.url}"
+    # Whoops needs to write to special file!
+    with open(os.environ["GITHUB_OUTPUT"], "a") as output:
+        print(f"REPORT_URL={report.url}", file=output)
+
+    print(f"Report URL: {report.url}")
 
 
 if __name__ == "__main__":
